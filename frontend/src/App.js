@@ -13,7 +13,7 @@ function App() {
   const [note, setNote] = useState('');
   const [savedNotes, setSavedNotes] = useState([]);
 
-  // Загрузка задач из localStorage
+  // 1. Загрузка задач из localStorage (БЕЗ БЭКЕНДА, ЧТОБЫ НЕ ТОРМОЗИЛО)
   useEffect(() => {
     const saved = localStorage.getItem('tasks');
     if (saved) {
@@ -21,94 +21,19 @@ function App() {
     }
   }, []);
 
-  // Сохранение задач в localStorage
+  // 2. Сохранение задач в localStorage при каждом изменении
   useEffect(() => {
     localStorage.setItem('tasks', JSON.stringify(tasks));
   }, [tasks]);
 
-  // Загрузка заметок
-  useEffect(() => {
-    const saved = localStorage.getItem('notes');
-    if (saved) setSavedNotes(JSON.parse(saved));
-  }, []);
-
-  // Сохранение заметок
-  useEffect(() => {
-    localStorage.setItem('notes', JSON.stringify(savedNotes));
-  }, [savedNotes]);
-
-  // ДОБАВЛЕНИЕ ЗАДАЧИ (исправлено)
-  const addTask = () => {
-    if (newTask.trim() === '') {
-      setParrotMessage('⚠️ Напиши задачу!');
-      return;
-    }
-    const newTaskObj = {
-      id: Date.now(),
-      title: newTask,
-      completed: false,
-      createdAt: new Date().toLocaleString('ru-RU')
-    };
-    setTasks(prevTasks => [...prevTasks, newTaskObj]);
-    setNewTask('');
-    setParrotMessage(`✅ Задача "${newTask}" добавлена!`);
-  };
-
-  // Переключение статуса
-  const toggleTask = (id) => {
-    setTasks(tasks.map(t => 
-      t.id === id ? { ...t, completed: !t.completed } : t
-    ));
-  };
-
-  // Удаление задачи
-  const deleteTask = (id) => {
-    setTasks(tasks.filter(t => t.id !== id));
-  };
-
-  // Сохранение заметки
-  const saveNote = () => {
-    if (note.trim() === '') return;
-    setSavedNotes([...savedNotes, { text: note, date: new Date().toLocaleString('ru-RU') }]);
-    setNote('');
-    setParrotMessage('📌 Заметка сохранена!');
-  };
-
-  // Таймер
-  const updateTimer = () => {
-    if (!timerTarget) {
-      setTimeLeft(null);
-      return;
-    }
-    const target = new Date(timerTarget);
-    if (isNaN(target.getTime())) {
-      setTimeLeft('❌ неверная дата');
-      return;
-    }
-    const diff = target - new Date();
-    if (diff <= 0) {
-      setTimeLeft('🔔 СОБЫТИЕ НАСТУПИЛО!');
-      return;
-    }
-    const days = Math.floor(diff / (1000 * 3600 * 24));
-    const hours = Math.floor((diff % (86400000)) / 3600000);
-    const minutes = Math.floor((diff % 3600000) / 60000);
-    const seconds = Math.floor((diff % 60000) / 1000);
-    setTimeLeft(`${days}д ${hours}ч ${minutes}м ${seconds}с`);
-  };
-
-  useEffect(() => {
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, [timerTarget]);
-
-  // Анимация Кеши
+  // Анимация Кеши (оригинальная от Дипсика)
   useEffect(() => {
     let frame;
     let start = null;
     const duration = 7000;
     let from = { ...parrotPosition };
     let to = { x: Math.random() * (window.innerWidth - 280), y: Math.random() * (window.innerHeight - 180) };
+
     const step = (ts) => {
       if (!start) start = ts;
       const elapsed = ts - start;
@@ -121,7 +46,7 @@ function App() {
         frame = requestAnimationFrame(step);
       } else {
         start = null;
-        from = { ...parrotPosition };
+        from = { x, y };
         to = { x: Math.random() * (window.innerWidth - 280), y: Math.random() * (window.innerHeight - 180) };
         frame = requestAnimationFrame(step);
       }
@@ -130,9 +55,77 @@ function App() {
     return () => cancelAnimationFrame(frame);
   }, []);
 
-  const filteredTasks = tasks.filter(t => {
-    if (filter === 'active') return !t.completed;
-    if (filter === 'completed') return t.completed;
+  // ПОФИКШЕННАЯ ФУНКЦИЯ ДОБАВЛЕНИЯ (Теперь точно работает)
+  const addTask = () => {
+    if (!newTask.trim()) {
+      setParrotMessage('⚠️ Пустую задачу не добавишь. Напиши что-то.');
+      return;
+    }
+    
+    const now = new Date();
+    const krasTime = now.toLocaleString('ru-RU', { timeZone: 'Asia/Krasnoyarsk' });
+    
+    const task = { 
+      id: Date.now(), 
+      title: newTask, 
+      completed: false, 
+      createdAt: krasTime 
+    };
+
+    setTasks([...tasks, task]); // Обновляем список задач
+    setNewTask(''); // Очищаем поле ввода
+    setParrotMessage(`✅ Задача "${task.title}" добавлена!`);
+    
+    setTimeout(() => setParrotMessage('💡 Жми ✅ когда сделаешь, 🗑️ если не нужно'), 4500);
+  };
+
+  const toggleTask = (id) => {
+    setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+    const task = tasks.find(t => t.id === id);
+    setParrotMessage(!task.completed ? `🎉 Отлично! Выполнено.` : `↩️ Вернули задачу.`);
+  };
+
+  const deleteTask = (id) => {
+    setTasks(tasks.filter(t => t.id !== id));
+    setParrotMessage(`🗑️ Задача удалена.`);
+  };
+
+  const saveNote = () => {
+    if (!note.trim()) {
+      setParrotMessage('📝 Заметка пустая.');
+      return;
+    }
+    setSavedNotes([...savedNotes, { text: note, date: new Date().toLocaleString('ru-RU') }]);
+    setNote('');
+    setParrotMessage('📌 Заметка сохранена!');
+  };
+
+  const updateTimer = () => {
+    if (!timerTarget) {
+      setTimeLeft(null);
+      return;
+    }
+    const target = new Date(timerTarget);
+    const diff = target - new Date();
+    if (diff <= 0) {
+      setTimeLeft('🔔 СОБЫТИЕ НАСТУПИЛО!');
+      return;
+    }
+    const days = Math.floor(diff / (1000 * 3600 * 24));
+    const hours = Math.floor((diff % 86400000) / 3600000);
+    const minutes = Math.floor((diff % 3600000) / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+    setTimeLeft(`${days}д ${hours}ч ${minutes}м ${seconds}с`);
+  };
+
+  useEffect(() => {
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [timerTarget]);
+
+  const filteredTasks = tasks.filter(task => {
+    if (filter === 'active') return !task.completed;
+    if (filter === 'completed') return task.completed;
     return true;
   });
 
@@ -173,12 +166,12 @@ function App() {
                     <span className="task-date">{task.createdAt}</span>
                   </div>
                   <div className="task-actions">
-                    <button onClick={() => toggleTask(task.id)}>{task.completed ? '↩️' : '✅'}</button>
-                    <button onClick={() => deleteTask(task.id)}>🗑️</button>
+                    <button onClick={() => toggleTask(task.id)}>{task.completed ? '↩️ вернуть' : '✅ готово'}</button>
+                    <button onClick={() => deleteTask(task.id)}>🗑️ удалить</button>
                   </div>
                 </li>
               ))}
-              {filteredTasks.length === 0 && <div className="empty-message">✨ задач пока нет. Добавь первую!</div>}
+              {filteredTasks.length === 0 && <div className="empty-message">✨ ЗАДАЧ ПОКА НЕТ. ДОБАВЬ ПЕРВУЮ!</div>}
             </ul>
           </div>
 
@@ -187,19 +180,17 @@ function App() {
               <h3>⏱ таймер событий</h3>
               <input type="datetime-local" value={timerTarget} onChange={e => setTimerTarget(e.target.value)} />
               {timeLeft && <div className="timer-display">{timeLeft}</div>}
-              <p className="timer-hint">выбери дату и время → Кеша покажет, сколько осталось</p>
             </div>
 
             {showNotes && (
               <div className="notes-panel">
                 <h3>📝 быстрые заметки</h3>
-                <textarea placeholder="напиши что-нибудь важное..." value={note} onChange={e => setNote(e.target.value)} />
+                <textarea placeholder="напиши что-то..." value={note} onChange={e => setNote(e.target.value)} />
                 <button onClick={saveNote}>💾 сохранить заметку</button>
                 <div className="notes-list">
                   {savedNotes.slice().reverse().map((n, i) => (
                     <div key={i} className="note-item"><div>{n.text}</div><small>{n.date}</small></div>
                   ))}
-                  {savedNotes.length === 0 && <div className="empty-notes">нет заметок</div>}
                 </div>
               </div>
             )}
