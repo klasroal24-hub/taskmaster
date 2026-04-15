@@ -1,30 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
-const apiUrl = 'https://taskmaster-backend.onrender.com';
-
 function App() {
   const [tasks, setTasks] = useState([]);
   const [newTask, setNewTask] = useState('');
   const [filter, setFilter] = useState('all');
   const [timerTarget, setTimerTarget] = useState('');
   const [timeLeft, setTimeLeft] = useState(null);
-  const [parrotMessage, setParrotMessage] = useState('🦜 Привет! Я Кеша. Добавляй задачи — я подскажу.');
+  const [parrotMessage, setParrotMessage] = useState('🦜 Привет! Я Кеша. Добавляй задачи — они сохранятся в браузере.');
   const [parrotPosition, setParrotPosition] = useState({ x: 20, y: 20 });
   const [showNotes, setShowNotes] = useState(false);
   const [note, setNote] = useState('');
   const [savedNotes, setSavedNotes] = useState([]);
 
-  // Загрузка задач с бэкенда
+  // Загрузка задач из localStorage
   useEffect(() => {
-    fetch(`${apiUrl}/tasks`)
-      .then(res => res.json())
-      .then(data => {
-        const withDate = data.map(t => ({ ...t, createdAt: t.createdAt || new Date().toISOString() }));
-        setTasks(withDate);
-      })
-      .catch(() => setTasks([]));
+    const savedTasks = localStorage.getItem('tasks');
+    if (savedTasks) setTasks(JSON.parse(savedTasks));
   }, []);
+
+  // Сохранение задач в localStorage
+  useEffect(() => {
+    localStorage.setItem('tasks', JSON.stringify(tasks));
+  }, [tasks]);
+
+  // Загрузка заметок
+  useEffect(() => {
+    const saved = localStorage.getItem('notes');
+    if (saved) setSavedNotes(JSON.parse(saved));
+  }, []);
+
+  // Сохранение заметок
+  useEffect(() => {
+    localStorage.setItem('notes', JSON.stringify(savedNotes));
+  }, [savedNotes]);
 
   // Анимация Кеши
   useEffect(() => {
@@ -55,7 +64,6 @@ function App() {
     return () => cancelAnimationFrame(frame);
   }, []);
 
-  // ИСПРАВЛЕННАЯ ФУНКЦИЯ ДОБАВЛЕНИЯ
   const addTask = () => {
     if (!newTask.trim()) {
       setParrotMessage('⚠️ Пустую задачу не добавишь. Напиши что-то.');
@@ -63,66 +71,30 @@ function App() {
     }
     const now = new Date();
     const krasTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Krasnoyarsk' }));
-    
-    // 1. Создаем временную задачу для мгновенного отображения
-    const tempTask = { 
-      id: Date.now(), 
-      title: newTask, 
-      completed: false, 
-      createdAt: krasTime.toISOString() 
+    const newTaskObj = {
+      id: Date.now(),
+      title: newTask,
+      completed: false,
+      createdAt: krasTime.toISOString()
     };
-
-    // 2. Сразу пушим в список, чтобы кнопка "отвисла"
-    setTasks(prev => [...prev, tempTask]);
-    const savedName = newTask;
-    setNewTask(''); // Очищаем поле ввода сразу
-    setParrotMessage(`✅ Задача "${savedName}" добавлена!`);
-
-    // 3. Отправляем на сервер в фоновом режиме
-    fetch(`${apiUrl}/tasks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: tempTask.title, completed: tempTask.completed, createdAt: tempTask.createdAt })
-    })
-      .then(() => fetch(`${apiUrl}/tasks`))
-      .then(res => res.json())
-      .then(data => {
-        const withDate = data.map(t => ({ ...t, createdAt: t.createdAt || new Date().toISOString() }));
-        setTasks(withDate); // Обновляем список уже с реальными данными от сервера
-      })
-      .catch(() => {
-        setParrotMessage('🦜 Кеша в шоке: сервер тупит, но я сохранил задачу в списке!');
-      });
+    setTasks([...tasks, newTaskObj]);
+    setNewTask('');
+    setParrotMessage(`✅ Задача "${newTask}" добавлена!`);
+    setTimeout(() => setParrotMessage('💡 Жми ✅ когда сделаешь, 🗑️ если не нужно'), 4500);
   };
 
-  const toggleTask = (id, completed, title, createdAt) => {
-    fetch(`${apiUrl}/tasks/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, completed: !completed, createdAt })
-    })
-      .then(() => {
-        setParrotMessage(completed ? `↩️ Вернули "${title}". Доделай!` : `🎉 Отлично! "${title}" выполнено.`);
-        return fetch(`${apiUrl}/tasks`);
-      })
-      .then(res => res.json())
-      .then(data => {
-        const withDate = data.map(t => ({ ...t, createdAt: t.createdAt || new Date().toISOString() }));
-        setTasks(withDate);
-      });
+  const toggleTask = (id) => {
+    setTasks(tasks.map(task => 
+      task.id === id ? { ...task, completed: !task.completed } : task
+    ));
+    const task = tasks.find(t => t.id === id);
+    setParrotMessage(task?.completed ? `↩️ Вернули "${task.title}". Доделай!` : `🎉 Отлично! "${task.title}" выполнено.`);
   };
 
-  const deleteTask = (id, title) => {
-    fetch(`${apiUrl}/tasks/${id}`, { method: 'DELETE' })
-      .then(() => {
-        setParrotMessage(`💀 Задача "${title}" удалена. Добавляй новую.`);
-        return fetch(`${apiUrl}/tasks`);
-      })
-      .then(res => res.json())
-      .then(data => {
-        const withDate = data.map(t => ({ ...t, createdAt: t.createdAt || new Date().toISOString() }));
-        setTasks(withDate);
-      });
+  const deleteTask = (id) => {
+    const task = tasks.find(t => t.id === id);
+    setTasks(tasks.filter(task => task.id !== id));
+    setParrotMessage(`💀 Задача "${task?.title}" удалена. Добавляй новую.`);
   };
 
   const saveNote = () => {
@@ -188,13 +160,7 @@ function App() {
         </div>
 
         <div className="add-task">
-          <input 
-            type="text" 
-            placeholder="новая задача" 
-            value={newTask} 
-            onChange={e => setNewTask(e.target.value)} 
-            onKeyPress={e => e.key === 'Enter' && addTask()} 
-          />
+          <input type="text" placeholder="новая задача" value={newTask} onChange={e => setNewTask(e.target.value)} onKeyPress={e => e.key === 'Enter' && addTask()} />
           <button onClick={addTask}>➕ добавить задачу</button>
         </div>
 
@@ -215,8 +181,8 @@ function App() {
                     <span className="task-date">{formatDate(task.createdAt)}</span>
                   </div>
                   <div className="task-actions">
-                    <button onClick={() => toggleTask(task.id, task.completed, task.title, task.createdAt)}>{task.completed ? '↩️ вернуть' : '✅ готово'}</button>
-                    <button onClick={() => deleteTask(task.id, task.title)}>🗑️ удалить</button>
+                    <button onClick={() => toggleTask(task.id)}>{task.completed ? '↩️ вернуть' : '✅ готово'}</button>
+                    <button onClick={() => deleteTask(task.id)}>🗑️ удалить</button>
                   </div>
                 </li>
               ))}
