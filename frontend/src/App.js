@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
+const apiUrl = 'https://taskmaster-backend.onrender.com';
+
 function App() {
   const [tasks, setTasks] = useState([]);
   const [newTask, setNewTask] = useState('');
@@ -13,8 +15,9 @@ function App() {
   const [note, setNote] = useState('');
   const [savedNotes, setSavedNotes] = useState([]);
 
+  // Загрузка задач с бэкенда
   useEffect(() => {
-    fetch('http://localhost:8000/tasks')
+    fetch(`${apiUrl}/tasks`)
       .then(res => res.json())
       .then(data => {
         const withDate = data.map(t => ({ ...t, createdAt: t.createdAt || new Date().toISOString() }));
@@ -23,6 +26,7 @@ function App() {
       .catch(() => setTasks([]));
   }, []);
 
+  // Анимация Кеши
   useEffect(() => {
     let frame;
     let start = null;
@@ -59,7 +63,7 @@ function App() {
     const now = new Date();
     const krasTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Krasnoyarsk' }));
     const task = { title: newTask, completed: false, createdAt: krasTime.toISOString() };
-    fetch('http://localhost:8000/tasks', {
+    fetch(`${apiUrl}/tasks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(task)
@@ -68,7 +72,7 @@ function App() {
         setNewTask('');
         setParrotMessage(`✅ Задача "${newTask}" добавлена. Дата: ${formatDate(krasTime.toISOString())}`);
         setTimeout(() => setParrotMessage('💡 Жми ✅ когда сделаешь, 🗑️ если не нужно'), 4500);
-        return fetch('http://localhost:8000/tasks');
+        return fetch(`${apiUrl}/tasks`);
       })
       .then(res => res.json())
       .then(data => {
@@ -78,14 +82,14 @@ function App() {
   };
 
   const toggleTask = (id, completed, title, createdAt) => {
-    fetch(`http://localhost:8000/tasks/${id}`, {
+    fetch(`${apiUrl}/tasks/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, completed: !completed, createdAt })
     })
       .then(() => {
         setParrotMessage(completed ? `↩️ Вернули "${title}". Доделай!` : `🎉 Отлично! "${title}" выполнено.`);
-        return fetch('http://localhost:8000/tasks');
+        return fetch(`${apiUrl}/tasks`);
       })
       .then(res => res.json())
       .then(data => {
@@ -95,10 +99,10 @@ function App() {
   };
 
   const deleteTask = (id, title) => {
-    fetch(`http://localhost:8000/tasks/${id}`, { method: 'DELETE' })
+    fetch(`${apiUrl}/tasks/${id}`, { method: 'DELETE' })
       .then(() => {
         setParrotMessage(`💀 Задача "${title}" удалена. Добавляй новую.`);
-        return fetch('http://localhost:8000/tasks');
+        return fetch(`${apiUrl}/tasks`);
       })
       .then(res => res.json())
       .then(data => {
