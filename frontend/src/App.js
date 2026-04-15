@@ -55,6 +55,7 @@ function App() {
     return () => cancelAnimationFrame(frame);
   }, []);
 
+  // ИСПРАВЛЕННАЯ ФУНКЦИЯ ДОБАВЛЕНИЯ
   const addTask = () => {
     if (!newTask.trim()) {
       setParrotMessage('⚠️ Пустую задачу не добавишь. Напиши что-то.');
@@ -62,22 +63,35 @@ function App() {
     }
     const now = new Date();
     const krasTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Krasnoyarsk' }));
-    const task = { title: newTask, completed: false, createdAt: krasTime.toISOString() };
+    
+    // 1. Создаем временную задачу для мгновенного отображения
+    const tempTask = { 
+      id: Date.now(), 
+      title: newTask, 
+      completed: false, 
+      createdAt: krasTime.toISOString() 
+    };
+
+    // 2. Сразу пушим в список, чтобы кнопка "отвисла"
+    setTasks(prev => [...prev, tempTask]);
+    const savedName = newTask;
+    setNewTask(''); // Очищаем поле ввода сразу
+    setParrotMessage(`✅ Задача "${savedName}" добавлена!`);
+
+    // 3. Отправляем на сервер в фоновом режиме
     fetch(`${apiUrl}/tasks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(task)
+      body: JSON.stringify({ title: tempTask.title, completed: tempTask.completed, createdAt: tempTask.createdAt })
     })
-      .then(() => {
-        setNewTask('');
-        setParrotMessage(`✅ Задача "${newTask}" добавлена. Дата: ${formatDate(krasTime.toISOString())}`);
-        setTimeout(() => setParrotMessage('💡 Жми ✅ когда сделаешь, 🗑️ если не нужно'), 4500);
-        return fetch(`${apiUrl}/tasks`);
-      })
+      .then(() => fetch(`${apiUrl}/tasks`))
       .then(res => res.json())
       .then(data => {
         const withDate = data.map(t => ({ ...t, createdAt: t.createdAt || new Date().toISOString() }));
-        setTasks(withDate);
+        setTasks(withDate); // Обновляем список уже с реальными данными от сервера
+      })
+      .catch(() => {
+        setParrotMessage('🦜 Кеша в шоке: сервер тупит, но я сохранил задачу в списке!');
       });
   };
 
@@ -174,7 +188,13 @@ function App() {
         </div>
 
         <div className="add-task">
-          <input type="text" placeholder="новая задача" value={newTask} onChange={e => setNewTask(e.target.value)} onKeyPress={e => e.key === 'Enter' && addTask()} />
+          <input 
+            type="text" 
+            placeholder="новая задача" 
+            value={newTask} 
+            onChange={e => setNewTask(e.target.value)} 
+            onKeyPress={e => e.key === 'Enter' && addTask()} 
+          />
           <button onClick={addTask}>➕ добавить задачу</button>
         </div>
 
